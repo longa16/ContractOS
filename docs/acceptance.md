@@ -31,19 +31,19 @@
 
 ## Delivered scope versus roadmap
 
-| Brief deliverable                                     | This version                                                                               |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Architecture/schema/migrations/Auth/RBAC              | Implemented                                                                                |
-| Owner and VA dashboards                               | Implemented, bounded views                                                                 |
-| Contractor portal/application/documents               | Implemented, invitation-only                                                               |
-| Opportunity ingestion and deduplication               | SAM integration code; live provider test requires a key                                    |
-| Maryland source integration                           | Source-linked manual import; automatic source polling deferred                             |
-| AI classification and RFP extraction                  | Implemented strict drafts; live OpenAI test requires a key, no OCR service                 |
-| Compliance/approvals/matching/pricing/proposals/audit | Implemented acquisition-to-bid controls; full PDF sections completed by humans             |
-| n8n workflow A                                        | Importable inactive SAM schedule; activation requires credentials                          |
-| n8n B–F and I                                         | Implemented application/RPC flows and dashboard exceptions; not standalone n8n automations |
-| n8n G–H / awarded-contract operations                 | Deferred: contracts/work orders/QC/invoices and provider communications                    |
-| DocuSign/Gmail/Twilio                                 | Deferred; no external messages sent                                                        |
-| Deployment/config/test documentation                  | Delivered; hosted staging/production verification remains operator work                    |
+| Brief deliverable                                     | This version                                                                        |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Architecture/schema/migrations/Auth/RBAC              | Implemented                                                                         |
+| Owner and VA dashboards                               | Implemented, bounded views                                                          |
+| Contractor portal/application/documents               | Implemented, invitation-only                                                        |
+| Opportunity ingestion and deduplication               | SAM integration code; live provider test requires a key                             |
+| Maryland source integration                           | Source-linked manual import; automatic source polling deferred                      |
+| AI classification and RFP extraction                  | Implemented strict drafts; live OpenAI test requires a key, no OCR service          |
+| Compliance/approvals/matching/pricing/proposals/audit | Implemented acquisition-to-bid controls; full PDF sections completed by humans      |
+| SAM LangChain/LangGraph agent                         | Bounded pagination + CLI + authenticated endpoint; live provider validation pending |
+| Other agent workflows                                 | Application/RPC flows exist; autonomous LangChain agents remain to implement        |
+| Awarded-contract operations                           | Deferred: contracts/work orders/QC/invoices and provider communications             |
+| DocuSign/Gmail/Twilio                                 | Deferred; no external messages sent                                                 |
+| Deployment/config/test documentation                  | Delivered; hosted staging/production verification remains operator work             |
 
 This scope follows the brief's acquisition-to-bid MVP priority. Do not label the autonomous company, unattended contract execution or hosted production deployment as complete.

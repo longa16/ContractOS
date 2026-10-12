@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { workerClient } from "@/lib/supabase";
-import { normalizeSam, uuid } from "@/lib/domain";
-import { boundedText } from "@/lib/http";
+import { uuid } from "@/lib/domain";
+import { runSamAgent } from "@/lib/agents/sam";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 export async function POST(request: Request) {
@@ -25,41 +25,17 @@ export async function POST(request: Request) {
         { error: "Integration unavailable" },
         { status: 503 },
       );
-    const date = (d: Date) =>
-      `${String(d.getUTCMonth() + 1).padStart(2, "0")}/${String(d.getUTCDate()).padStart(2, "0")}/${d.getUTCFullYear()}`;
-    const to = new Date();
-    const from = new Date(to.getTime() - 7 * 86400000);
-    const url = new URL("https://api.sam.gov/opportunities/v2/search");
-    url.search = new URLSearchParams({
-      api_key: key,
-      postedFrom: date(from),
-      postedTo: date(to),
-      ncode: "561720",
-      limit: "100",
-    }).toString();
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(20000),
-      cache: "no-store",
-      redirect: "error",
-    });
-    if (!response.ok) throw new Error("Source unavailable");
-    const records = normalizeSam(
-      JSON.parse(await boundedText(response, 2000000)),
-    );
     const db = workerClient();
-    let ingested = 0;
-    for (const data of records) {
-      const { error } = await db.rpc("ingest_opportunity", { org, data });
-      if (error) throw new Error("Database rejected record");
-      ingested++;
-    }
-    return Response.json({
-      ingested,
-      source: "sam",
-      windowDays: 7,
-      limit: 100,
-      paginationRequired: true,
+    const result = await runSamAgent({
+      apiKey: key,
+      persist: async (data, signal) => {
+        const { error } = await db
+          .rpc("ingest_opportunity", { org, data })
+          .abortSignal(signal);
+        if (error) throw new Error("Database rejected record");
+      },
     });
+    return Response.json(result);
   } catch {
     // Do not log fetch exceptions: request URLs may contain SAM API credentials.
     return Response.json(

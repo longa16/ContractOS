@@ -12,7 +12,7 @@ flowchart LR
     H --> L[OpenAI structured drafts]
     L --> V[Schema + exact source grounding]
     V --> R
-    W[n8n scheduled job] --> B[Fixed authenticated SAM ingestion endpoint]
+    W[CLI or scheduler] --> B[LangChain / LangGraph SAM agent]
     B --> G[SAM.gov API]
     B --> R
     R --> E[Compliance blockers / human approvals]
@@ -40,4 +40,4 @@ Submitted artifacts and approvals remain historical records. A later expired/rev
 
 ## Components and sources
 
-Schema and RPCs: `supabase/migrations/`. Prompts and strict output schemas: `src/lib/ai.ts` / `src/lib/domain.ts`. PDF isolation: `scripts/extract-pdf.mjs` / `src/lib/pdf.ts`. Workflows: `n8n/`. Deployment-specific secrets, live providers, storage guarantees and admin roles must be configured separately in each environment.
+Schema and RPCs: `supabase/migrations/`. Prompts and strict output schemas: `src/lib/ai.ts` / `src/lib/domain.ts`. PDF isolation: `scripts/extract-pdf.mjs` / `src/lib/pdf.ts`. SAM orchestration: `src/lib/agents/sam.ts`; CLI: `npm run agent:sam`. Deployment-specific secrets, live providers, storage guarantees and admin roles must be configured separately in each environment.

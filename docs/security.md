@@ -4,21 +4,21 @@ This document describes implemented controls and operator responsibilities. It i
 
 ## Implemented controls
 
-| Threat                              | Control                                                                                                                                            |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Internal MFA bypass                 | Database `aal2`, live session, confirmed/non-banned account and verified factor, verified Supabase session/claims, TOTP setup and challenge        |
-| Role escalation through signup      | Memberships are administrative only; no role from user-editable metadata                                                                           |
-| Cross-tenant/contractor access      | RLS, composite organization foreign keys, ownership checks in RPCs and private object policies                                                     |
-| Direct API write bypass             | No client INSERT/UPDATE/DELETE grants; each material write is an authorized RPC                                                                    |
-| CSRF                                | Next.js server-action checks plus exact `APP_ORIGIN` validation; mutations never exposed as GET routes                                             |
-| XSS / malicious files               | React text escaping, nonce CSP, no raw HTML, no inline remote document preview, attachment downloads, nosniff, permitted MIME/signature/size       |
-| Malicious PDF resource usage        | Separate parser process, stripped credential environment, 192 MiB V8 heap, 15-second deadline, 10 MiB input, 100 pages, 80k text limit, output cap |
-| SSRF / prompt instructions          | Fixed HTTPS provider URLs, no redirects or source-URL downloads, no AI tools, source text treated as untrusted data                                |
-| Unsupported AI facts                | Strict schemas, verbatim grounding, MISSING status, human verification; deterministic proposal provenance                                          |
-| Stale approvals/evidence            | Revision invalidation, current-time expiry checks, amendment re-review, explicit document/approval revocation                                      |
-| Proposal replacement after approval | Append-only storage, newest final PDF must be verified, approval bound to immutable document ID and revision                                       |
-| Credential/log leakage              | Server-only clients, HttpOnly auth/setup cookies, no raw provider/database errors or document content in logs, no secret in n8n exports            |
-| Audit tampering by users            | No mutation grants on audit/approval tables, audit inserted transactionally with business operations                                               |
+| Threat                              | Control                                                                                                                                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Internal MFA bypass                 | Database `aal2`, live session, confirmed/non-banned account and verified factor, verified Supabase session/claims, TOTP setup and challenge                                    |
+| Role escalation through signup      | Memberships are administrative only; no role from user-editable metadata                                                                                                       |
+| Cross-tenant/contractor access      | RLS, composite organization foreign keys, ownership checks in RPCs and private object policies                                                                                 |
+| Direct API write bypass             | No client INSERT/UPDATE/DELETE grants; each material write is an authorized RPC                                                                                                |
+| CSRF                                | Next.js server-action checks plus exact `APP_ORIGIN` validation; mutations never exposed as GET routes                                                                         |
+| XSS / malicious files               | React text escaping, nonce CSP, no raw HTML, no inline remote document preview, attachment downloads, nosniff, permitted MIME/signature/size                                   |
+| Malicious PDF resource usage        | Separate parser process, stripped credential environment, 192 MiB V8 heap, 15-second deadline, 10 MiB input, 100 pages, 80k text limit, output cap                             |
+| SSRF / prompt instructions          | Fixed HTTPS provider URLs, no redirects or source-URL downloads, no AI tools, source text treated as untrusted data                                                            |
+| Unsupported AI facts                | Strict schemas, verbatim grounding, MISSING status, human verification; deterministic proposal provenance                                                                      |
+| Stale approvals/evidence            | Revision invalidation, current-time expiry checks, amendment re-review, explicit document/approval revocation                                                                  |
+| Proposal replacement after approval | Append-only storage, newest final PDF must be verified, approval bound to immutable document ID and revision                                                                   |
+| Credential/log leakage              | Server-only clients, HttpOnly auth/setup cookies, no raw provider/database errors or document content in logs, no credentials in agent state/output; external tracing disabled |
+| Audit tampering by users            | No mutation grants on audit/approval tables, audit inserted transactionally with business operations                                                                           |
 
 Internal users who also own a contractor record still require MFA. Contractors can update availability/capacity and upload their own documents but cannot self-verify, view internal prices/proposals/audit, or inspect another contractor.
 
@@ -34,7 +34,7 @@ For synthetic development fixtures only, a trusted administrator may set `organi
 - Credentials sent to a model, prompt injection and false semantic interpretations remain risks. Do not upload CUI, government-restricted documents, SSNs/W-9s, payroll, identity documents or contractor insurance into AI. Explicit consent does not change contractual provider data-handling obligations. Establish an approved provider/account, retention terms and processing agreement before activation.
 - Matching currently supports exact trade and comma-separated geographic areas, basic capacity and fixed required documents. It does not establish eligibility, license applicability, bonding, workers' compensation, past performance or set-aside compliance. The owner must verify these for the specific opportunity and record relevant mandatory requirements.
 - Contract value, financial structures, legal retention and licenses differ by solicitation. The MVP conservatively requires W-9, insurance and license; a documented exemption requires a controlled policy change, not a fabricated document.
-- This is a private B2B MVP. The views are bounded, and the SAM connector is windowed. Add pagination, monitoring, distributed limits and production load testing before scaling.
+- This is a private B2B MVP. The views are bounded, and the SAM connector is windowed. Bounded pagination exists; add durable backfill, monitoring, distributed limits and production load testing before scaling.
 
 ## Retention and deletion
 

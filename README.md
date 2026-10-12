@@ -17,7 +17,7 @@ Périmètre confirmé : opportunités publiques et dossiers commerciaux ordinair
 - Prix : unités, coûts complémentaires justifiés et majoration, calcul en cents entiers et arrondi conservateur.
 - Offres : brouillon JSON traçable, export, préparation humaine du PDF final, quatre validations et contrôle spécifique de la sous-traitance/set-aside.
 - Soumission : blocage sur preuves manquantes/expirées/révoquées, échéance passée, prix/brouillon/package/approbations obsolètes. Autorisation liée au PDF exact ; consignation du reçu après dépôt humain sur le portail officiel.
-- Workflow n8n SAM.gov importable, désactivé par défaut et sans secret inclus.
+- Agent de collecte SAM.gov LangChain/LangGraph : outils bornés, pagination, validation et ingestion dédupliquée ; exécution manuelle ou planifiée sans n8n.
 
 Les sections finales, formulaires, signatures et dépôt officiel restent humains. L’OCR des scans, l’ingestion automatique Maryland, les communications externes, DocuSign et les opérations post-attribution (contrats, work orders, QC et facturation) sont des étapes ultérieures : voir [périmètre et critères](docs/acceptance.md). Aucun connecteur non implémenté n’est présenté comme fonctionnel.
 
@@ -66,20 +66,34 @@ Les tests PostgreSQL utilisent PGlite, un moteur PostgreSQL réel ; seules les i
 
 Copiez `.env.example` vers un fichier local ignoré si vous utilisez un projet hébergé ; pour la production, utilisez le gestionnaire de secrets du déploiement. Ne transmettez aucune valeur secrète dans un ticket ou dans le chat.
 
-| Variable                               | Usage                                                                                                        |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`             | URL du projet Supabase distinct pour cet environnement                                                       |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Clé publique publishable/anon ; la RLS reste obligatoire                                                     |
-| `APP_ORIGIN`                           | Origine exacte de l’application ; HTTPS en production                                                        |
-| `SUPABASE_SERVICE_ROLE_KEY`            | Serveur seulement, nécessaire au scan antivirus et à SAM ; contourne la RLS, ne jamais exposer au navigateur |
-| `INTEGRATION_TOKEN`                    | Jeton serveur aléatoire d’au moins 32 octets encodés base64url pour n8n ; jamais une clé publique            |
-| `INGEST_ORGANIZATION_ID`               | Organisation cible fixe de l’ingestion SAM                                                                   |
-| `SAM_GOV_API_KEY`                      | Clé SAM.gov côté serveur pour les opportunités                                                               |
-| `CONTRACTOS_OPENAI_API_KEY`            | Clé OpenAI côté serveur, facultative pour les saisies/extractions manuelles                                  |
-| `CONTRACTOS_OPENAI_MODEL`              | Modèle compatible avec les sorties JSON structurées ; défaut `gpt-4.1-mini`                                  |
+| Variable                               | Usage                                                                                                            |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | URL du projet Supabase distinct pour cet environnement                                                           |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Clé publique publishable/anon ; la RLS reste obligatoire                                                         |
+| `APP_ORIGIN`                           | Origine exacte de l’application ; HTTPS en production                                                            |
+| `SUPABASE_SERVICE_ROLE_KEY`            | Serveur seulement, nécessaire au scan antivirus et à SAM ; contourne la RLS, ne jamais exposer au navigateur     |
+| `INTEGRATION_TOKEN`                    | Jeton serveur aléatoire d’au moins 32 octets encodés base64url pour l’endpoint serveur ; jamais une clé publique |
+| `INGEST_ORGANIZATION_ID`               | Organisation cible fixe de l’ingestion SAM                                                                       |
+| `SAM_GOV_API_KEY`                      | Clé SAM.gov côté serveur pour les opportunités                                                                   |
+| `CONTRACTOS_OPENAI_API_KEY`            | Clé OpenAI côté serveur, facultative pour les saisies/extractions manuelles                                      |
+| `CONTRACTOS_OPENAI_MODEL`              | Modèle compatible avec les sorties JSON structurées ; défaut `gpt-4.1-mini`                                      |
 
 Le préfixe `CONTRACTOS_` évite les noms `OPENAI_*` réservés par la plateforme cloud. Les valeurs secrètes sont à saisir dans les paramètres sécurisés, jamais dans le chat.
 
 Destinations réseau : domaine exact du projet Supabase, `api.sam.gov`, `api.openai.com`, et registres npm/Docker/GitHub nécessaires au développement. Aucun URL fourni par un utilisateur ou par un document n’est téléchargé par le serveur.
 
 Pour le déploiement, la rétention, les sauvegardes, le chiffrement, les limites de charge et l’analyse de risque : [déploiement](docs/deployment.md), [sécurité](docs/security.md), [architecture](docs/architecture.md). Les intégrations SAM/OpenAI doivent être testées avec les identifiants de votre environnement avant activation ; les tests locaux n’établissent pas leur bon fonctionnement en production.
+
+## Agent SAM avec LangChain
+
+Après configuration serveur de `SAM_GOV_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL` et `INGEST_ORGANIZATION_ID` :
+
+```bash
+npm run agent:sam
+```
+
+L’agent LangGraph orchestre recherche officielle via un outil LangChain, validation des données et persistance RPC dans l’organisation configurée. Il utilise des règles déterministes, sans LLM pour la collecte ; les textes SAM ne deviennent jamais des instructions. Aucun téléchargement de pièces jointes ou dépôt d’offre n’est autorisé. Les clés sont conservées hors état du graphe et les traces externes doivent être désactivées.
+
+Chaque exécution couvre les sept derniers jours, NAICS 561720, au plus cinq pages de 100 résultats et 55 secondes. `paginationRequired=true` et le code de sortie CLI 2 signalent une fenêtre incomplète : ne pas considérer la collecte exhaustive. Les avis sans échéance exploitable sont comptés dans `skipped`. Une relance repart de la première page ; les écritures déjà réussies sont dédupliquées en base. Pas de checkpoint durable, de file de tâches ou de planificateur intégré à ce stade. Un ordonnanceur externe peut lancer cette commande sans chevauchement ; n8n n’est plus nécessaire. L’endpoint authentifié existant appelle le même agent.
+
+Les autres fonctions IA et métier ne sont pas encore converties en agents LangChain autonomes. Le test SAM réel nécessite une clé et reste à effectuer avant activation.

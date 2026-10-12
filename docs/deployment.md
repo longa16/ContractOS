@@ -12,7 +12,7 @@ Before production, complete the deployment controls below, validate with synthet
 2. Keep API exposed schemas restricted to `public` (and Supabase's own managed defaults); never expose `private`. Verify anon/authenticated grants and storage policies after migration.
 3. Configure a confirmed-email SMTP flow and exact callback allowlist for the HTTPS `APP_ORIGIN` plus `/auth/callback`. Do not add broad wildcard redirect URLs.
 4. Enable TOTP enrollment/verification, strong password policy, auth limits, leaked-password checks and a documented recovery flow. Manually bootstrap the first confirmed owner. Provision VA memberships only through an audited administrator.
-5. Restrict production service-role access to the ingestion worker's secret binding. Do not use it for user requests, browser SDKs, logs or n8n form fields.
+5. Restrict production service-role access to the ingestion worker's secret binding. Do not use it for user requests, browser SDKs, logs or agent state.
 6. Configure encrypted persistent disks/object storage, TLS, backup/PITR and a tested restore procedure through the provider. Restrict administrator access with MFA and least privilege. Review location, data-processing agreement and retention for ordinary commercial confidential data.
 
 ## Application
@@ -35,9 +35,9 @@ Headers include nonce CSP, frame denial, nosniff, no-referrer, restricted browse
 
 ## Integrations
 
-Import the inactive workflow in `n8n/`. Use managed HTTP Header Auth credentials with `Authorization: Bearer <INTEGRATION_TOKEN>`; enter the value securely in n8n. Set the application HTTPS origin manually. Review the schedule and quotas, then test with staging SAM/OpenAI bindings. Never export credential values with workflows.
+Configure the server-only SAM and Supabase credentials and fixed `INGEST_ORGANIZATION_ID`, then run `npm run agent:sam`. Use a scheduler with no overlapping executions; no scheduler is embedded in the application. The existing bearer-protected endpoint invokes the same LangChain/LangGraph agent. `INTEGRATION_TOKEN` is required only for this endpoint, not the CLI. Disable external LangSmith/LangChain tracing; never place secrets in graph inputs, outputs or logs.
 
-SAM defaults to NAICS 561720, the recent seven-day window and a bounded batch. Track response counts and pagination/backfill needs. Maryland sources are manual source-linked imports in this version, not a scraping integration. The server does not follow provider-supplied attachment URLs. Download solicitations through official portals, verify provenance, then upload the selected documents.
+SAM uses NAICS 561720, a seven-day window, up to five pages of 100 records, and a 55-second execution deadline. CLI exit 2 / `paginationRequired=true` means the window is incomplete; alert and arrange a bounded backfill before claiming complete coverage. Retries restart at page zero with database deduplication; there is no durable checkpoint or queue yet. Notices without usable deadlines are counted as skipped. Test with staging SAM credentials before enabling a schedule. Maryland imports remain manual. Provider attachment URLs are never fetched.
 
 No automatic external messages, e-signatures or bid submissions are enabled. Future automation must preserve approval gates, idempotency, per-source authentication and audit.
 
