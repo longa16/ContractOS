@@ -1047,5 +1047,170 @@ test("PostgreSQL authorization and acquisition-to-submission workflow", async (t
       assert(!rows.rows[0].content.claims.some((c) => c.fact_id === fid));
     },
   );
+
+  await t.test(
+    "shared public catalog and private selections preserve tenant boundaries and stale-source gates",
+    async () => {
+      const data = {
+        ...opportunityData,
+        source: "sam",
+        solicitation_number: "PUBLIC-SAM-001",
+        title: "Official public title",
+        naics: "561720",
+        set_aside: "SBA",
+        source_url: "https://sam.gov/opp/PUBLIC-SAM-001/view",
+      };
+      const cid = await as(
+        null,
+        "aal1",
+        () =>
+          rpc("ingest_catalog_opportunity($1::jsonb)", [JSON.stringify(data)]),
+        "service_role",
+      );
+      assert.equal(
+        await as(
+          null,
+          "aal1",
+          () =>
+            rpc("ingest_catalog_opportunity($1::jsonb)", [
+              JSON.stringify(data),
+            ]),
+          "service_role",
+        ),
+        cid,
+      );
+      await as(owner, "aal1", async () =>
+        assert.equal(
+          (await db.query("select * from opportunity_catalog")).rows.length,
+          0,
+        ),
+      );
+      await as(userA, "aal2", async () => {
+        assert.equal(
+          (await db.query("select * from opportunity_catalog")).rows.length,
+          0,
+        );
+        await assert.rejects(
+          rpc("select_catalog_opportunity($1,$2)", [org, cid]),
+        );
+      });
+      await as(owner, "aal2", async () => {
+        assert.equal(
+          (await db.query("select * from opportunity_catalog")).rows.length,
+          1,
+        );
+        await assert.rejects(
+          db.query("update opportunity_catalog set title='tampered'"),
+        );
+        await assert.rejects(
+          rpc("ingest_catalog_opportunity($1::jsonb)", [JSON.stringify(data)]),
+        );
+        await assert.rejects(
+          rpc("select_catalog_opportunity($1,$2)", [org2, cid]),
+        );
+      });
+      const a = await as(owner, "aal2", () =>
+        rpc("select_catalog_opportunity($1,$2)", [org, cid]),
+      );
+      assert.equal(
+        await as(va, "aal2", () =>
+          rpc("select_catalog_opportunity($1,$2)", [org, cid]),
+        ),
+        a,
+      );
+      await db.query("insert into memberships values($1,$2,'owner')", [
+        org2,
+        outsider,
+      ]);
+      await db.query(
+        "insert into auth.mfa_factors(user_id,status) values($1,'verified')",
+        [outsider],
+      );
+      const b = await as(outsider, "aal2", () =>
+        rpc("select_catalog_opportunity($1,$2)", [org2, cid]),
+      );
+      assert.notEqual(a, b);
+      await as(outsider, "aal2", async () => {
+        assert.equal(
+          (await db.query("select * from opportunities where id=$1", [a])).rows
+            .length,
+          0,
+        );
+        await assert.rejects(rpc("refresh_catalog_opportunity($1)", [a]));
+        await rpc("save_catalog_preferences($1,$2::jsonb)", [
+          org2,
+          JSON.stringify({ location: "Virginia", naics: "561720" }),
+        ]);
+      });
+      await as(owner, "aal2", async () => {
+        const prefs = await db.query<{
+          catalog_preferences: { location?: string };
+        }>("select catalog_preferences from organizations where id=$1", [org]);
+        assert.notEqual(prefs.rows[0].catalog_preferences.location, "Virginia");
+        await rpc("update_opportunity($1,$2::jsonb)", [
+          a,
+          JSON.stringify({
+            ...data,
+            title: "Private pursuit title",
+            description: "Confidential pursuit notes",
+          }),
+        ]);
+      });
+      assert.equal(
+        (
+          await db.query<{ title: string }>(
+            "select title from opportunity_catalog where id=$1",
+            [cid],
+          )
+        ).rows[0].title,
+        "Official public title",
+      );
+      await as(
+        null,
+        "aal1",
+        () =>
+          rpc("ingest_catalog_opportunity($1::jsonb)", [
+            JSON.stringify({ ...data, title: "Official amendment" }),
+          ]),
+        "service_role",
+      );
+      assert.equal(
+        (
+          await db.query<{ title: string }>(
+            "select title from opportunities where id=$1",
+            [a],
+          )
+        ).rows[0].title,
+        "Private pursuit title",
+      );
+      await as(owner, "aal2", async () => {
+        const blocks = await rpc<string[]>("compliance_blockers($1)", [a]);
+        assert.ok(blocks.some((x) => x.includes("Catalog notice changed")));
+        await rpc("refresh_catalog_opportunity($1)", [a]);
+        assert.ok(
+          !(await rpc<string[]>("compliance_blockers($1)", [a])).some((x) =>
+            x.includes("Catalog notice changed"),
+          ),
+        );
+      });
+      assert.equal(
+        (
+          await db.query<{ title: string }>(
+            "select title from opportunities where id=$1",
+            [a],
+          )
+        ).rows[0].title,
+        "Official amendment",
+      );
+      // Other organizations must review their own snapshot independently.
+      await as(outsider, "aal2", async () =>
+        assert.ok(
+          (await rpc<string[]>("compliance_blockers($1)", [b])).some((x) =>
+            x.includes("Catalog notice changed"),
+          ),
+        ),
+      );
+    },
+  );
   await db.close();
 });

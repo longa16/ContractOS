@@ -3,7 +3,7 @@ import { samConfiguration, safeSamDiagnostic } from "./diagnostics";
 import { runSamAgent } from "./sam";
 
 async function main() {
-  const { url, key, apiKey, org } = samConfiguration(process.env);
+  const { url, key, apiKey } = samConfiguration(process.env);
   if (process.argv.includes("--check-config")) {
     console.log(
       "SAM configuration present and structurally valid. No network request made; credentials and services are not verified.",
@@ -17,7 +17,7 @@ async function main() {
     apiKey,
     persist: async (data, signal) => {
       const { error } = await db
-        .rpc("ingest_opportunity", { org, data })
+        .rpc("ingest_catalog_opportunity", { data })
         .abortSignal(signal);
       if (error) throw new Error("Record rejected");
     },

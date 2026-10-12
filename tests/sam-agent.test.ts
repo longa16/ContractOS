@@ -104,7 +104,7 @@ test("configuration diagnostics name missing variables without exposing values",
     (error) => {
       const text = safeSamDiagnostic(error);
       return (
-        text.includes("INGEST_ORGANIZATION_ID") &&
+        text.includes("SUPABASE_SERVICE_ROLE_KEY") &&
         !text.includes("sensitive-value")
       );
     },
@@ -131,5 +131,16 @@ test("SAM HTTP status is diagnosable without response bodies or credential URLs"
         !text.includes("private-body")
       );
     },
+  );
+});
+
+test("central SAM configuration requires no organization identifier", async () => {
+  const { samConfiguration } = await import("../src/lib/agents/diagnostics");
+  assert.doesNotThrow(() =>
+    samConfiguration({
+      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "synthetic",
+      SAM_GOV_API_KEY: "synthetic",
+    }),
   );
 });

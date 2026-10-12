@@ -244,7 +244,7 @@ export function normalizeSam(raw: unknown) {
         description: x.solicitationNumber
           ? `Solicitation: ${x.solicitationNumber}`
           : "",
-        location: "",
+        location: samLocation(x.placeOfPerformance),
         trade: "janitorial",
         response_deadline: new Date(x.responseDeadLine!).toISOString(),
         // Fixed trusted destination; never fetch document URLs returned by a source.
@@ -253,4 +253,30 @@ export function normalizeSam(raw: unknown) {
         set_aside: x.typeOfSetAside ?? undefined,
       }),
     );
+}
+
+function samLocation(raw: unknown) {
+  const part = z.object({
+    name: z.string().max(100).optional(),
+    code: z.string().max(100).optional(),
+  });
+  const place = z
+    .object({
+      city: part.nullish(),
+      state: part.nullish(),
+      country: part.nullish(),
+      zip: z.string().max(30).nullish(),
+    })
+    .safeParse(raw);
+  if (!place.success) return "";
+  return [
+    place.data.city?.name,
+    place.data.state?.code,
+    place.data.state?.name,
+    place.data.country?.code,
+    place.data.zip,
+  ]
+    .filter(Boolean)
+    .join(", ")
+    .slice(0, 500);
 }

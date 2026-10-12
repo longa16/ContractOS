@@ -45,3 +45,9 @@ Use a separate privileged deletion job with approved requests, tenant/object che
 ## Security reporting
 
 Report issues privately to the repository owner. Include affected behavior, prerequisites and reproduction using synthetic data. Never include production credentials or actual confidential documents in a public issue. Rotate compromised bindings, invalidate sessions and audit privileged actions before restoring service.
+
+## Shared public catalog boundary
+
+The central SAM agent writes only validated official public metadata to `opportunity_catalog`, using a dedicated RPC. No per-organization dossier data is backfilled into that catalog. Live MFA-backed internal memberships are required for catalog reads; contractors and anonymous users have no access. Catalog selection and refresh require membership in the target organization and use controlled database functions. Preferences remain tenant-owned. Direct client catalog mutations are denied.
+
+Each private selection stores the source catalog revision. Material catalog changes invalidate revision-based approvals for open linked dossiers; stale snapshots also block submission through database compliance checks. Refresh is explicit and resets mandatory requirements for review. Closed/submitted dossiers are immutable with respect to catalog refresh. The legacy organization-ingestion RPC is retained for compatibility but is no longer used by either collector entrypoint.

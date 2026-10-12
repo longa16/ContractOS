@@ -47,3 +47,7 @@
 | Deployment/config/test documentation                  | Delivered; hosted staging/production verification remains operator work             |
 
 This scope follows the brief's acquisition-to-bid MVP priority. Do not label the autonomous company, unattended contract execution or hosted production deployment as complete.
+
+## Shared catalog acceptance
+
+Automated PostgreSQL coverage checks global deduplication, no-MFA/contractor access denial, client write denial, cross-organization selection/refresh denial, two independent private selections, isolated saved filters, no publication of private notes, and submission blockers on changed source revisions. The browser owner flow covers saved filters, selection into a private dossier and explicit refresh after a synthetic source change, using the real local Supabase services. Live SAM/provider coverage remains pending real credentials.

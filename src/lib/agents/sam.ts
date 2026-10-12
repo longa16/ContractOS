@@ -122,7 +122,7 @@ export async function runSamAgent(deps: SamAgentDependencies) {
           await deps.persist(record, signal);
         } catch {
           throw new SamAgentError(
-            "SAM persistence failed; check Supabase availability, service-role key, migrations and organization UUID; replay is deduplicated",
+            "SAM persistence failed; check Supabase availability, service-role key, migrations and catalog ingestion permissions; replay is deduplicated",
           );
         }
       }

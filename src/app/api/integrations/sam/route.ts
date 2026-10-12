@@ -1,6 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
 import { workerClient } from "@/lib/supabase";
-import { uuid } from "@/lib/domain";
 import { runSamAgent } from "@/lib/agents/sam";
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -18,7 +17,6 @@ export async function POST(request: Request) {
   )
     return Response.json({ error: "Not authorized" }, { status: 401 });
   try {
-    const org = uuid.parse(process.env.INGEST_ORGANIZATION_ID);
     const key = process.env.SAM_GOV_API_KEY;
     if (!key)
       return Response.json(
@@ -30,7 +28,7 @@ export async function POST(request: Request) {
       apiKey: key,
       persist: async (data, signal) => {
         const { error } = await db
-          .rpc("ingest_opportunity", { org, data })
+          .rpc("ingest_catalog_opportunity", { data })
           .abortSignal(signal);
         if (error) throw new Error("Database rejected record");
       },

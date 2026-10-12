@@ -35,7 +35,7 @@ function checked(result: { error: unknown | null }) {
   if (result.error) throw new Error("Action rejected");
 }
 async function action(
-  path: "/workspace" | "/portal" | "/login" | "/mfa",
+  path: "/workspace" | "/workspace/catalog" | "/portal" | "/login" | "/mfa",
   work: () => Promise<string | void>,
   rerenderOnly = false,
 ) {
@@ -132,8 +132,8 @@ export async function enrollMfa() {
       });
       if (result.error || !result.data)
         throw new Error("MFA enrollment rejected");
-    // Supabase owns the encrypted MFA secret. This user's temporary provisioning URI
-    // goes only in an HttpOnly setup cookie and private, noncached setup UI, never logs/URLs.
+      // Supabase owns the encrypted MFA secret. This user's temporary provisioning URI
+      // goes only in an HttpOnly setup cookie and private, noncached setup UI, never logs/URLs.
       const { cookies } = await import("next/headers");
       (await cookies()).set(
         "contractos-mfa-setup",
@@ -569,5 +569,37 @@ export async function revokeApprovals(form: FormData) {
         reason: text(form, "reason"),
       }),
     );
+  });
+}
+
+export async function selectCatalogOpportunity(form: FormData) {
+  return action("/workspace/catalog", async () => {
+    const { db, org } = await requireInternal();
+    const result = await db.rpc("select_catalog_opportunity", {
+      org,
+      cid: id(form, "catalog_id"),
+    });
+    checked(result);
+    return `/workspace?opportunity=${uuid.parse(result.data)}`;
+  });
+}
+export async function refreshCatalogOpportunity(form: FormData) {
+  return action("/workspace", async () => {
+    const { db } = await requireInternal();
+    const oid = id(form, "opportunity_id");
+    checked(await db.rpc("refresh_catalog_opportunity", { oid }));
+    return `/workspace?opportunity=${oid}`;
+  });
+}
+export async function saveCatalogPreferences(form: FormData) {
+  return action("/workspace/catalog", async () => {
+    const { db, org } = await requireInternal();
+    const data = {
+      trade: text(form, "trade", 100),
+      location: text(form, "location", 100),
+      naics: text(form, "naics", 20),
+      set_aside: text(form, "set_aside", 200),
+    };
+    checked(await db.rpc("save_catalog_preferences", { org, data }));
   });
 }

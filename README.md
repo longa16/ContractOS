@@ -9,7 +9,7 @@ Périmètre confirmé : opportunités publiques et dossiers commerciaux ordinair
 - Application Next.js : Command Center propriétaire/VA et portail prestataire.
 - Supabase Auth : confirmation d’e-mail, TOTP et MFA obligatoire en base pour les utilisateurs internes.
 - PostgreSQL : isolation par organisation et prestataire, écritures uniquement par RPC contrôlées, audit des décisions et actions matérielles.
-- Opportunités : saisie manuelle/Maryland, ingestion SAM.gov dédupliquée, métadonnées et brief IA non vérifié.
+- Catalogue public commun SAM.gov, filtres enregistrés par organisation et sélection en dossiers privés ; saisie manuelle/Maryland et brief IA non vérifié.
 - Documents : bucket privé, limite 10 Mo, PDF/PNG/JPEG contrôlés, quarantaine et scan antivirus obligatoires par défaut, téléchargements en pièce jointe, stockage append-only, vérification et révocation par le propriétaire.
 - RFP : extraction PDF texte en processus limité, analyse OpenAI explicitement autorisée, sorties structurées et extraits ancrés dans les pages. Aucun document prestataire n’est envoyé à l’IA.
 - Matrice de conformité : distinction obligatoire/informatif, document/page/extrait, preuve et validation humaine. Les amendements rouvrent les exigences obligatoires et invalident les validations.
@@ -73,7 +73,6 @@ Copiez `.env.example` vers un fichier local ignoré si vous utilisez un projet h
 | `APP_ORIGIN`                           | Origine exacte de l’application ; HTTPS en production                                                            |
 | `SUPABASE_SERVICE_ROLE_KEY`            | Serveur seulement, nécessaire au scan antivirus et à SAM ; contourne la RLS, ne jamais exposer au navigateur     |
 | `INTEGRATION_TOKEN`                    | Jeton serveur aléatoire d’au moins 32 octets encodés base64url pour l’endpoint serveur ; jamais une clé publique |
-| `INGEST_ORGANIZATION_ID`               | Organisation cible fixe de l’ingestion SAM                                                                       |
 | `SAM_GOV_API_KEY`                      | Clé SAM.gov côté serveur pour les opportunités                                                                   |
 | `CONTRACTOS_OPENAI_API_KEY`            | Clé OpenAI côté serveur, facultative pour les saisies/extractions manuelles                                      |
 | `CONTRACTOS_OPENAI_MODEL`              | Modèle compatible avec les sorties JSON structurées ; défaut `gpt-4.1-mini`                                      |
@@ -86,15 +85,23 @@ Pour le déploiement, la rétention, les sauvegardes, le chiffrement, les limite
 
 ## Agent SAM avec LangChain
 
-Après configuration serveur de `SAM_GOV_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL` et `INGEST_ORGANIZATION_ID` :
+Après configuration serveur de `SAM_GOV_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL` :
 
 ```bash
 npm run agent:sam -- --check-config
 npm run agent:sam
 ```
 
-L’agent LangGraph orchestre recherche officielle via un outil LangChain, validation des données et persistance RPC dans l’organisation configurée. Il utilise des règles déterministes, sans LLM pour la collecte ; les textes SAM ne deviennent jamais des instructions. Aucun téléchargement de pièces jointes ou dépôt d’offre n’est autorisé. Les clés sont conservées hors état du graphe et les traces externes doivent être désactivées.
+L’agent LangGraph orchestre recherche officielle via un outil LangChain, validation des données et persistance RPC dans le catalogue commun. Il utilise des règles déterministes, sans LLM pour la collecte ; les textes SAM ne deviennent jamais des instructions. Aucun téléchargement de pièces jointes ou dépôt d’offre n’est autorisé. Les clés sont conservées hors état du graphe et les traces externes doivent être désactivées.
 
 Chaque exécution couvre les sept derniers jours, NAICS 561720, au plus cinq pages de 100 résultats et 55 secondes. `paginationRequired=true` et le code de sortie CLI 2 signalent une fenêtre incomplète : ne pas considérer la collecte exhaustive. Les avis sans échéance exploitable sont comptés dans `skipped`. Une relance repart de la première page ; les écritures déjà réussies sont dédupliquées en base. Pas de checkpoint durable, de file de tâches ou de planificateur intégré à ce stade. Un ordonnanceur externe peut lancer cette commande sans chevauchement ; n8n n’est plus nécessaire. L’endpoint authentifié existant appelle le même agent.
 
 Les autres fonctions IA et métier ne sont pas encore converties en agents LangChain autonomes. Le test SAM réel nécessite une clé et reste à effectuer avant activation.
+
+## Catalogue partagé et dossiers privés
+
+La collecte centrale n’utilise plus `INGEST_ORGANIZATION_ID` : cette ancienne variable peut être retirée. Appliquez la migration `202610120009_shared_catalog.sql` dans Supabase (ou relancez `npm run local:setup` pour Docker local). Lancez ensuite `npm run agent:sam`.
+
+Dans le Command Center, ouvrez **Catalogue SAM.gov**, filtrez par métier, zone, NAICS et set-aside, puis enregistrez les critères de votre organisation. **Créer mon dossier privé** copie l’annonce dans votre espace ; les documents, notes, prestataires, prix et validations restent isolés. Une annonce déjà sélectionnée ouvre son dossier existant.
+
+Les changements du catalogue invalident les validations des dossiers ouverts liés. L’actualisation est explicite : elle remplace les métadonnées source du dossier et impose une nouvelle revue des exigences. Les dossiers soumis/clos restent historiques. Les anciens dossiers SAM ne sont jamais exportés vers le catalogue ; leur liaison se fait seulement lors d’une sélection de la même annonce officielle. Le catalogue ne contient que les métadonnées de l’API publique, est lisible par les membres internes avec MFA, et n’est pas exposé aux prestataires ou visiteurs anonymes.

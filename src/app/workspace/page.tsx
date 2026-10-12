@@ -22,6 +22,7 @@ import {
   updateOpportunity,
   revokeApprovals,
   revokeFact,
+  refreshCatalogOpportunity,
 } from "../actions";
 import {
   Choice,
@@ -158,6 +159,17 @@ export default async function Workspace({
   const selected = uuid.safeParse(params.opportunity).success
     ? opps.find((o) => o.id === params.opportunity)
     : opps[0];
+  const catalogSource = selected?.catalog_id
+    ? await db
+        .from("opportunity_catalog")
+        .select("revision")
+        .eq("id", selected.catalog_id)
+        .single()
+    : null;
+  const staleCatalog =
+    selected?.catalog_id &&
+    (catalogSource?.error ||
+      selected.catalog_revision !== catalogSource?.data?.revision);
   const selectedRequirements = rs.filter(
     (r) => r.opportunity_id === selected?.id,
   );
@@ -238,6 +250,7 @@ export default async function Workspace({
         </div>
       </div>
       <nav className="tabs">
+        <Link href="/workspace/catalog">Catalogue SAM.gov</Link>
         {[
           ["opportunities", "Opportunités"],
           ["contractors", "Réseau prestataires"],
@@ -264,6 +277,18 @@ export default async function Workspace({
           un administrateur. Ce mode ne doit pas être utilisé pour des dossiers
           réels en production.
         </p>
+      )}
+      {staleCatalog && (
+        <section className="notice warning">
+          <p>
+            L’annonce publique a changé. Actualisez ses métadonnées puis
+            revérifiez les exigences et validations du dossier privé.
+          </p>
+          <form action={refreshCatalogOpportunity}>
+            <input type="hidden" name="opportunity_id" value={selected.id} />
+            <button type="submit">Actualiser depuis le catalogue</button>
+          </form>
+        </section>
       )}
       {view === "opportunities" && (
         <>

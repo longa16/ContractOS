@@ -20,6 +20,7 @@ const accounts = {
   b: `b-${suffix}@example.test`,
 };
 const ids: Record<string, string> = {};
+let catalogId: string;
 function sql(statement: string) {
   return execFileSync(
     "docker",
@@ -68,6 +69,21 @@ test.describe.serial("Local Auth, MFA, application and private Storage", () => {
         throw new Error("Local test account provisioning failed");
       ids[role] = data.user.id;
     }
+    const catalog = await admin.rpc("ingest_catalog_opportunity", {
+      data: {
+        solicitation_number: `CATALOG-${suffix}`,
+        title: `Public catalog ${suffix}`,
+        agency: "Official Test",
+        description: "Public synthetic metadata",
+        location: "Maryland",
+        trade: "janitorial",
+        naics: "561720",
+        response_deadline: "2099-01-01T00:00:00Z",
+      },
+    });
+    if (catalog.error || !catalog.data)
+      throw new Error("Local catalog fixture failed");
+    catalogId = catalog.data;
     sql(`insert into public.organizations(id,name) values('${org}','Browser Security Test');
       insert into public.memberships values('${org}','${ids.owner}','owner'),('${org}','${ids.va}','va');
       insert into public.contractors(organization_id,user_id,company_name,email,trade,service_area) values
@@ -103,6 +119,8 @@ test.describe.serial("Local Auth, MFA, application and private Storage", () => {
         .map((t) => `delete from public.${t} where organization_id='${org}';`)
         .join("\n") + `delete from public.organizations where id='${org}';`,
     );
+    if (catalogId)
+      sql(`delete from public.opportunity_catalog where id='${catalogId}';`);
     for (const id of Object.values(ids)) await admin.auth.admin.deleteUser(id);
   });
   test("Anonymous routes are protected and response security headers exist", async ({
@@ -208,6 +226,63 @@ test.describe.serial("Local Auth, MFA, application and private Storage", () => {
       .click();
     await expect(
       page.getByRole("alert").filter({ hasText: "Action refusée" }),
+    ).toBeVisible();
+
+    await page
+      .getByRole("link", { name: "Catalogue SAM.gov", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Catalogue commun SAM.gov" }),
+    ).toBeVisible();
+    await page.getByLabel("Zone géographique").fill("Maryland");
+    await page
+      .getByRole("button", {
+        name: "Enregistrer les filtres de l’organisation",
+      })
+      .click();
+    await expect(page).toHaveURL(/catalog\?result=ok/);
+    await expect(page.getByLabel("Zone géographique")).toHaveValue("Maryland");
+    const card = page
+      .locator("article")
+      .filter({
+        has: page.getByRole("heading", {
+          name: `Public catalog ${suffix}`,
+          exact: true,
+        }),
+      });
+    await card.getByRole("button", { name: "Créer mon dossier privé" }).click();
+    await expect(page).toHaveURL(/workspace\?opportunity=/);
+    await expect(
+      page.getByRole("link", { name: `Public catalog ${suffix}`, exact: true }),
+    ).toBeVisible();
+    const changed = await admin.rpc("ingest_catalog_opportunity", {
+      data: {
+        solicitation_number: `CATALOG-${suffix}`,
+        title: `Public amendment ${suffix}`,
+        agency: "Official Test",
+        description: "Public synthetic metadata",
+        location: "Maryland",
+        trade: "janitorial",
+        naics: "561720",
+        response_deadline: "2099-01-01T00:00:00Z",
+      },
+    });
+    expect(changed.error).toBeNull();
+    await page.reload();
+    await expect(
+      page.getByText(
+        "Catalog notice changed: refresh and review the private dossier",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Actualiser depuis le catalogue" })
+      .click();
+    await expect(
+      page.getByRole("link", {
+        name: `Public amendment ${suffix}`,
+        exact: true,
+      }),
     ).toBeVisible();
   });
   test("Contractor uploads privately and another contractor cannot download or self-verify", async ({

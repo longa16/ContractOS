@@ -35,7 +35,7 @@ Headers include nonce CSP, frame denial, nosniff, no-referrer, restricted browse
 
 ## Integrations
 
-Configure the server-only SAM and Supabase credentials and fixed `INGEST_ORGANIZATION_ID`, then run `npm run agent:sam`. Use a scheduler with no overlapping executions; no scheduler is embedded in the application. The existing bearer-protected endpoint invokes the same LangChain/LangGraph agent. `INTEGRATION_TOKEN` is required only for this endpoint, not the CLI. Disable external LangSmith/LangChain tracing; never place secrets in graph inputs, outputs or logs.
+Apply migration 009, then configure the server-only SAM and Supabase credentials for the shared catalog, then run `npm run agent:sam`. Use a scheduler with no overlapping executions; no scheduler is embedded in the application. The existing bearer-protected endpoint invokes the same LangChain/LangGraph agent. `INTEGRATION_TOKEN` is required only for this endpoint, not the CLI. Disable external LangSmith/LangChain tracing; never place secrets in graph inputs, outputs or logs.
 
 SAM uses NAICS 561720, a seven-day window, up to five pages of 100 records, and a 55-second execution deadline. CLI exit 2 / `paginationRequired=true` means the window is incomplete; alert and arrange a bounded backfill before claiming complete coverage. Retries restart at page zero with database deduplication; there is no durable checkpoint or queue yet. Notices without usable deadlines are counted as skipped. Test with staging SAM credentials before enabling a schedule. Maryland imports remain manual. Provider attachment URLs are never fetched.
 

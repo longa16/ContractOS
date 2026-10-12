@@ -28,7 +28,7 @@ PostgreSQL is the authorization and integrity boundary: organizations, composite
 
 AI is outside the trust boundary. Public text is processed only after explicit consent. The model has no tools, credentials, approval authority or access to contractor files. Exact excerpts and pages are checked mechanically; semantic correctness remains a human responsibility. All extracted requirements start MISSING. Proposals are generated deterministically from verified facts and requirement responses rather than unconstrained AI prose.
 
-An external worker token permits only a fixed source ingestion route. Its organization and source endpoint are server-configured; a caller cannot choose a target URL, database role or arbitrary RPC. Integration service credentials still have broad administrative privileges and must remain in a dedicated server secret binding.
+An external worker token permits only a fixed source ingestion route. Its shared catalog destination and source endpoint are fixed; a caller cannot choose a target URL, database role or arbitrary RPC. Integration service credentials still have broad administrative privileges and must remain in a dedicated server secret binding.
 
 ## Revision model
 
@@ -41,3 +41,9 @@ Submitted artifacts and approvals remain historical records. A later expired/rev
 ## Components and sources
 
 Schema and RPCs: `supabase/migrations/`. Prompts and strict output schemas: `src/lib/ai.ts` / `src/lib/domain.ts`. PDF isolation: `scripts/extract-pdf.mjs` / `src/lib/pdf.ts`. SAM orchestration: `src/lib/agents/sam.ts`; CLI: `npm run agent:sam`. Deployment-specific secrets, live providers, storage guarantees and admin roles must be configured separately in each environment.
+
+## Shared catalog
+
+`opportunity_catalog` holds official SAM public metadata, deduplicated globally by notice ID. Central collection uses `ingest_catalog_opportunity`; no organization binding is needed. Authenticated internal members with live MFA sessions can read the same catalog. Contractors/anonymous users cannot read it. Per-organization filter preferences are stored in `organizations.catalog_preferences`.
+
+Selection copies source metadata into a tenant-owned opportunity, linked to catalog ID/revision. No private notes, document data, pricing, or approvals flow back to the catalog. Source updates invalidate revision-based gates for open linked dossiers without overwriting them; `compliance_blockers` rejects stale source snapshots. Explicit refresh copies the new public metadata, increments the private revision, and resets mandatory requirements for re-review. Submitted/closed dossiers cannot refresh. Legacy private dossiers are not automatically published or backfilled.
