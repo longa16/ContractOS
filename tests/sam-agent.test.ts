@@ -95,3 +95,41 @@ test("malformed source data and persistence errors fail closed", async () => {
     /SAM persistence failed/,
   );
 });
+
+test("configuration diagnostics name missing variables without exposing values", async () => {
+  const { samConfiguration, safeSamDiagnostic } =
+    await import("../src/lib/agents/diagnostics");
+  assert.throws(
+    () => samConfiguration({ SAM_GOV_API_KEY: "sensitive-value" }),
+    (error) => {
+      const text = safeSamDiagnostic(error);
+      return (
+        text.includes("INGEST_ORGANIZATION_ID") &&
+        !text.includes("sensitive-value")
+      );
+    },
+  );
+  assert.ok(
+    !safeSamDiagnostic(new Error("private-key")).includes("private-key"),
+  );
+});
+test("SAM HTTP status is diagnosable without response bodies or credential URLs", async () => {
+  const { safeSamDiagnostic } = await import("../src/lib/agents/diagnostics");
+  await assert.rejects(
+    runSamAgent({
+      apiKey: "private-key",
+      fetch: async () => new Response("private-body", { status: 403 }),
+      persist: async () => {
+        assert.fail();
+      },
+    }),
+    (error) => {
+      const text = safeSamDiagnostic(error);
+      return (
+        text.includes("403") &&
+        !text.includes("private-key") &&
+        !text.includes("private-body")
+      );
+    },
+  );
+});

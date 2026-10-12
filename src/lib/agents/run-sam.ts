@@ -1,24 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
-import { uuid } from "../domain";
+import { samConfiguration, safeSamDiagnostic } from "./diagnostics";
 import { runSamAgent } from "./sam";
 
 async function main() {
-  const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
-  if (
-    url.username ||
-    url.password ||
-    !(
-      url.protocol === "https:" ||
-      (url.protocol === "http:" &&
-        ["localhost", "127.0.0.1"].includes(url.hostname))
-    )
-  )
-    throw new Error("Invalid database destination");
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const apiKey = process.env.SAM_GOV_API_KEY;
-  if (!key || !apiKey) throw new Error("Missing worker configuration");
-  const org = uuid.parse(process.env.INGEST_ORGANIZATION_ID);
-  const db = createClient(url.toString(), key, {
+  const { url, key, apiKey, org } = samConfiguration(process.env);
+  if (process.argv.includes("--check-config")) {
+    console.log(
+      "SAM configuration present and structurally valid. No network request made; credentials and services are not verified.",
+    );
+    return;
+  }
+  const db = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const result = await runSamAgent({
@@ -33,9 +25,7 @@ async function main() {
   console.log(JSON.stringify(result));
   if (result.paginationRequired) process.exitCode = 2;
 }
-main().catch(() => {
-  console.error(
-    "SAM agent failed. Check server configuration/provider availability; replay is deduplicated.",
-  );
+main().catch((error: unknown) => {
+  console.error(safeSamDiagnostic(error));
   process.exitCode = 1;
 });

@@ -3,6 +3,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { normalizeSam, samResponse } from "../domain";
 import { boundedText } from "../http";
+import { SamAgentError } from "./diagnostics";
 
 type RecordInput = ReturnType<typeof normalizeSam>[number];
 export interface SamAgentDependencies {
@@ -22,7 +23,7 @@ export async function runSamAgent(deps: SamAgentDependencies) {
       (value) => value?.toLowerCase() === "true",
     )
   )
-    throw new Error("External agent tracing must be disabled");
+    throw new SamAgentError("External agent tracing must be disabled");
   const maxPages = z
     .number()
     .int()
@@ -59,7 +60,10 @@ export async function runSamAgent(deps: SamAgentDependencies) {
           cache: "no-store",
           redirect: "error",
         });
-        if (!response.ok) throw new Error("Source unavailable");
+        if (!response.ok)
+          throw new SamAgentError(
+            `SAM HTTP ${response.status}: check API authorization (401/403), quota (429), or provider availability (5xx).`,
+          );
         const raw = samResponse.parse(
           JSON.parse(await boundedText(response, 2000000)),
         );
@@ -74,9 +78,12 @@ export async function runSamAgent(deps: SamAgentDependencies) {
           count: raw.opportunitiesData.length,
           total: total.data,
         });
-      } catch {
+      } catch (error) {
+        if (error instanceof SamAgentError) throw error;
         // Provider exceptions can contain the credential-bearing request URL.
-        throw new Error("SAM source failed; retry the bounded run");
+        throw new SamAgentError(
+          "SAM source failed: network/timeout or invalid response; retry the bounded run",
+        );
       }
     },
     {
@@ -114,7 +121,9 @@ export async function runSamAgent(deps: SamAgentDependencies) {
         try {
           await deps.persist(record, signal);
         } catch {
-          throw new Error("SAM persistence failed; replay is deduplicated");
+          throw new SamAgentError(
+            "SAM persistence failed; check Supabase availability, service-role key, migrations and organization UUID; replay is deduplicated",
+          );
         }
       }
       return {

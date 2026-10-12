@@ -89,6 +89,7 @@ Pour le déploiement, la rétention, les sauvegardes, le chiffrement, les limite
 Après configuration serveur de `SAM_GOV_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL` et `INGEST_ORGANIZATION_ID` :
 
 ```bash
+npm run agent:sam -- --check-config
 npm run agent:sam
 ```
 
