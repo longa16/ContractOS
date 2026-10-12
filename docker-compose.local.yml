@@ -1,0 +1,106 @@
+# Local development only. Uses real GoTrue/PostgREST/Storage and lean PostgreSQL.
+# All image identities are pinned to official registry digests. No production keys.
+name: contractos-dev
+services:
+  db:
+    image: postgres@sha256:aa90e97ee862e558111d34cfb8b2c4bec768c2b039fb791341686928560263b3
+    container_name: supabase_db_contractos
+    environment:
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD}
+    volumes: [contractos-db:/var/lib/postgresql/data]
+    networks: [local]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  auth:
+    image: supabase/gotrue@sha256:f2112b9289422f205df4ea15b8b550d425ae42528ea54521faa32cc7b62490de
+    container_name: contractos_auth
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: http://127.0.0.1:54321/auth/v1
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${LOCAL_AUTH_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: http://localhost:3000
+      GOTRUE_URI_ALLOW_LIST: http://localhost:3000/auth/callback
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 900
+      GOTRUE_JWT_SECRET: ${LOCAL_JWT_SECRET}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_SMTP_HOST: mail
+      GOTRUE_SMTP_PORT: 1025
+      GOTRUE_SMTP_ADMIN_EMAIL: local@example.test
+      GOTRUE_SMTP_SENDER_NAME: ContractOS Local
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
+      GOTRUE_MFA_TOTP_ENROLL_ENABLED: "true"
+      GOTRUE_MFA_TOTP_VERIFY_ENABLED: "true"
+      GOTRUE_PASSWORD_MIN_LENGTH: 14
+      GOTRUE_PASSWORD_REQUIRED_CHARACTERS: "abcdefghijklmnopqrstuvwxyz:ABCDEFGHIJKLMNOPQRSTUVWXYZ:0123456789:!@#$%^&*()_+-=[]{};,.<>?"
+      LOG_LEVEL: warn
+    networks: [local]
+  rest:
+    image: postgrest/postgrest@sha256:7c5840727ad683b0fdbfb9810930665b34f8b44884a4dc740aa8844748a2b85e
+    container_name: contractos_rest
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${LOCAL_REST_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${LOCAL_JWT_SECRET}
+      PGRST_DB_EXTRA_SEARCH_PATH: public,extensions
+      PGRST_LOG_LEVEL: warn
+    networks: [local]
+  storage:
+    image: supabase/storage-api@sha256:5a3ecdc67dbe9e88a56810b5b2f432f2d93708dcb4dc9de34e78e342b390eb4d
+    container_name: contractos_storage
+    environment:
+      ANON_KEY: ${LOCAL_ANON_KEY}
+      SERVICE_KEY: ${LOCAL_SERVICE_KEY}
+      AUTH_JWT_SECRET: ${LOCAL_JWT_SECRET}
+      JWT_SECRET: ${LOCAL_JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${LOCAL_STORAGE_PASSWORD}@db:5432/postgres
+      POSTGREST_URL: http://rest:3000
+      FILE_SIZE_LIMIT: 10485760
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: local
+      GLOBAL_S3_BUCKET: stub
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+      LOG_LEVEL: warn
+    volumes: [contractos-storage:/var/lib/storage]
+    networks: [local]
+  gateway:
+    image: kong@sha256:1b53405d8680a09d6f44494b7990bf7da2ea43f84a258c59717d4539abf09f6d
+    container_name: contractos_gateway
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /tmp/contractos-kong.yml
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_ADMIN_LISTEN: "off"
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_LOG_LEVEL: warn
+      KONG_PROXY_ACCESS_LOG: "off"
+    ports: ["127.0.0.1:54321:8000"]
+    networks: [local, edge]
+  mail:
+    image: axllent/mailpit@sha256:f7f7c31de4de59540ad6515a0ca057a77525bca2069b6e747d873ca66c10fe08
+    container_name: contractos_mail
+    ports: ["127.0.0.1:54324:8025"]
+    networks: [local, edge]
+networks:
+  local:
+    driver: bridge
+    internal: true
+  edge:
+    driver: bridge
+volumes:
+  contractos-db:
+  contractos-storage:
